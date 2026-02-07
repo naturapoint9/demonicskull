@@ -10,18 +10,39 @@ const fs = require('fs');
 const app = express();
 const PORT = 3000;
 
-const ENTRIES_FILE = path.join(__dirname, 'guestbook-entries.json');
 const GUESTBOOK_HTML = path.join(__dirname, 'guestbook.html');
-const COUNTER_FILE = path.join(__dirname, 'counter.json');
 const INDEX_HTML = path.join(__dirname, 'index.html');
 const ENTRIES_PER_PAGE = 10;
+
+// --- Writable data directory (Vercel uses a read-only FS, /tmp is writable) ---
+const IS_VERCEL = !!process.env.VERCEL;
+const DATA_DIR = IS_VERCEL ? '/tmp' : __dirname;
+const ENTRIES_FILE = path.join(DATA_DIR, 'guestbook-entries.json');
+const COUNTER_FILE = path.join(DATA_DIR, 'counter.json');
+
+// On Vercel cold start, copy seed data to /tmp if not already there
+if (IS_VERCEL) {
+  if (!fs.existsSync(ENTRIES_FILE)) {
+    const seed = path.join(__dirname, 'guestbook-entries.json');
+    if (fs.existsSync(seed)) {
+      fs.copyFileSync(seed, ENTRIES_FILE);
+    }
+  }
+  if (!fs.existsSync(COUNTER_FILE)) {
+    const seed = path.join(__dirname, 'counter.json');
+    if (fs.existsSync(seed)) {
+      fs.copyFileSync(seed, COUNTER_FILE);
+    }
+  }
+}
 
 // ============================================
 //  56K MODEM SIMULATOR
 //  "Please wait while the page loads..."
 //  *beeee brrrrr kssshhhh bong bong bong*
 // ============================================
-const MODEM_MODE = process.env.MODEM_MODE !== 'false';  // Enabled by default! Set MODEM_MODE=false to disable
+// Modem mode disabled on Vercel (serverless functions have a 10s timeout, can't stream slowly)
+const MODEM_MODE = !IS_VERCEL && process.env.MODEM_MODE !== 'false';
 const MODEM_BPS = 56000;                                // 56kbps modem (just like 1999)
 const MODEM_BYTES_PER_SEC = Math.floor(MODEM_BPS / 8);  // ~7000 bytes/sec
 const MODEM_LATENCY = 120;                               // 120ms initial latency per request
@@ -324,22 +345,27 @@ app.post('/sign-guestbook', (req, res) => {
 // --- Serve all other static files ---
 app.use(express.static(__dirname));
 
-// --- Start the server ---
-app.listen(PORT, () => {
-  console.log('');
-  console.log('  =============================================');
-  console.log('   DEMONICSKULL.COM is now running!');
-  console.log('   "I am Murray! The all-powerful demonic server!"');
-  console.log('  =============================================');
-  console.log('');
-  console.log(`  Visit: http://localhost:${PORT}`);
-  console.log('');
-  if (MODEM_MODE) {
-    console.log('  [56K MODEM MODE: ON]');
-    console.log('  All responses throttled to 56kbps (~7 KB/s)');
-    console.log('  Visitors will experience authentic 1999 load times!');
-    console.log('  Tip: Add ?turbo=1 to any URL to bypass throttling');
-    console.log('  Tip: Set MODEM_MODE=false to disable globally');
+// --- Start the server (local dev only, Vercel uses the export) ---
+if (!IS_VERCEL) {
+  app.listen(PORT, () => {
     console.log('');
-  }
-});
+    console.log('  =============================================');
+    console.log('   DEMONICSKULL.COM is now running!');
+    console.log('   "I am Murray! The all-powerful demonic server!"');
+    console.log('  =============================================');
+    console.log('');
+    console.log(`  Visit: http://localhost:${PORT}`);
+    console.log('');
+    if (MODEM_MODE) {
+      console.log('  [56K MODEM MODE: ON]');
+      console.log('  All responses throttled to 56kbps (~7 KB/s)');
+      console.log('  Visitors will experience authentic 1999 load times!');
+      console.log('  Tip: Add ?turbo=1 to any URL to bypass throttling');
+      console.log('  Tip: Set MODEM_MODE=false to disable globally');
+      console.log('');
+    }
+  });
+}
+
+// Export for Vercel serverless
+module.exports = app;
