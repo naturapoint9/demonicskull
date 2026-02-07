@@ -15,7 +15,7 @@ const INDEX_HTML = path.join(__dirname, 'index.html');
 const ENTRIES_PER_PAGE = 10;
 
 // --- Writable data directory (Vercel uses a read-only FS, /tmp is writable) ---
-const IS_VERCEL = !!process.env.VERCEL;
+const IS_VERCEL = !!process.env.VERCEL || !!process.env.AWS_LAMBDA_FUNCTION_NAME || __dirname === '/var/task';
 const DATA_DIR = IS_VERCEL ? '/tmp' : __dirname;
 const ENTRIES_FILE = path.join(DATA_DIR, 'guestbook-entries.json');
 const COUNTER_FILE = path.join(DATA_DIR, 'counter.json');
